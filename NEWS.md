@@ -1,3 +1,114 @@
+3.4.0 2019-08-24 Totoro
+=======================
+
+The main change is to add a tree-transformation phase. This simplifies the
+code a little and allows us to turn `if ...: raise AssertionError` into
+`assert`, and many `if ..: else if ...` into `if ... elif ..`
+
+Use options `--show=before` and `--show=after` to see the before the tree transformation phase and after the tree transformation phase.
+
+Most of the heavy lifting for this was done by x0ret.
+
+Other changes:
+
+- Fix issue #275, #283 (process to fix this bug is documented on wiki), #284
+- blacken more code
+- CircleCI adjustments for a changing CircleCi
+- Require more recent `xdis` for Python 3.8
+- Fix bugs in code using `BUILD_LIST_UNPACK` and variants
+
+3.3.5 2019-07-03 Pre Independence Day
+=====================================
+
+Again, most of the work in this is release is thanks to x0ret.
+
+- Handle annotation arguments in Python 3.x
+- Fix _vararg_ and function signatures in 3.x
+- Some 3.x < 3.6 `while` (1)/`if` fixes &mdash; others remain
+- Start reinstating `else if` -> `elif`
+- `LOAD_CONST` -> `LOAD_CODE` where appropriate
+- option `--weak-verify` is now `--syntax-verify`
+- code cleanups, start using [black](https://github.com/python/black) to reformat text
+
+
+3.3.4 2019-06-19 Fleetwood at 65
+================================
+
+Most of the work in this is release is thanks to x0ret.
+
+- Major work was done by x0ret to correct function signatures and include annotation types
+- Handle Python 3.6 `STORE_ANNOTATION` [#58](https://github.com/rocky/python-uncompyle6/issues/58)
+- Friendlier assembly output
+- `LOAD_CONST` replaced by `LOAD_STR` where appropriate to simplify parsing and improve clarity
+- remove unneeded parenthesis in a generator expression when it is the single argument to the function [#247](https://github.com/rocky/python-uncompyle6/issues/246)
+- Bug in noting an async function [#246](https://github.com/rocky/python-uncompyle6/issues/246)
+- Handle Unicode docstrings and fix docstring bugs [#241](https://github.com/rocky/python-uncompyle6/issues/241)
+- Add short option -T as an alternate for --tree+
+- Some grammar cleanup
+
+3.3.3 2019-05-19 Henry and Lewis
+================================
+
+As before, decomplation bugs fixed. The focus has primarily been on
+Python 3.7. But with this release, releases will be put on hold,as a
+better control-flow detection is worked on . This has been needed for a
+while, and is long overdue. It will probably also take a while to get
+done as good as what we have now.
+
+However this work will be done in a new project
+[decompyle3](https://github.com/rocky/python-decompile3).  In contrast
+to _uncompyle6_ the code will be written assuming a modern Python 3,
+e.g. 3.7. It is originally intended to decompile Python version 3.7
+and greater.
+
+* A number of Python 3.7+ chained comparisons were fixed
+* Revise Python 3.6ish format string handling
+* Go over operator precedence, e.g. for AST `IfExp`
+
+Reported Bug Fixes
+------------------
+
+* [#239: 3.7 handling of 4-level attribute import](https://github.com/rocky/python-uncompyle6/issues/239),
+* [#229: Inconsistent if block in python3.6](https://github.com/rocky/python-uncompyle6/issues/229),
+* [#227: Args not appearing in decompiled src when kwargs is specified explicitly (call_ex_kw)](https://github.com/rocky/python-uncompyle6/issues/227)
+2.7 confusion around "and" versus comprehension "if"
+* [#225: 2.7 confusion around "and" vs comprehension "if"](https://github.com/rocky/python-uncompyle6/issues/225)
+
+3.3.2 2019-05-03 Better Friday
+==============================
+
+As before, lots of decomplation bugs fixed. The focus has primarily
+been on Python 3.6. We can now parse the entire 3.6.8 Python library
+and verify that without an error. The same is true for 3.5.8. A number
+of the bugs fixed though are not contained to these versions. In fact
+some span back as far as 2.x
+
+But as before, many more remain in the 3.7 and 3.8 range which will
+get addressed in future releases
+
+Pypy 3.6 support was started. Pypy 3.x detection fixed (via `xdis`)
+
+3.3.1 2019-04-19 Good Friday
+==========================
+
+Lots of decomplation bugs, especially in the 3.x series fixed. Don't worry though, many more remain.
+
+* Add annotation return values in 3.6+
+* Fix 3.6+ lambda parameter handling decompilation
+* Fix 3.7+ chained comparison decompilation
+* split out semantic-action customization into more separate files
+* Add 3.8 try/else
+* Fix 2.7 generator decompilation
+* Fix some parser failures fixes in 3.4+ using test_pyenvlib
+* Add more run tests
+
+3.3.0 2019-04-14 Holy Week
+==========================
+
+* First cut at Python 3.8 (many bugs remain)
+* Reinstate -c | --compile (compile before disassembly) option
+* The usual smattering of bug and doc fixes
+
 3.2.6 2019-03-23 Mueller Report
 =======================================
 
@@ -6,23 +117,25 @@ Mostly more of the same: bug fixes and pull requests.
 Bug Fixes
 -----------
 
-* [#155: Python 3.x bytecode confusing "try/else" with "try" in a loop](https://github.com/rocky/python-uncompyle6/issues/155),
-* [#200: Python 3 bug in not detecting end bounds of an "if" ... "elif"](https://github.com/rocky/python-uncompyle6/issues/200),
-* [#208: Comma placement in 3.6 and 3.7 **kwargs](https://github.com/rocky/python-uncompyle6/issues/208),
-* [#209: Fix "if" return boundary in 3.6+](https://github.com/rocky/python-uncompyle6/issues/209),
+* [#221: Wrong grammar for nested ifelsestmt (in Python 3.7 at least)](https://github.com/rocky/python-uncompyle6/issues/221)
 * [#215: 2.7 can have two JUMP_BACKs at the end of a while loop](https://github.com/rocky/python-uncompyle6/issues/215)
+* [#209: Fix "if" return boundary in 3.6+](https://github.com/rocky/python-uncompyle6/issues/209),
+* [#208: Comma placement in 3.6 and 3.7 **kwargs](https://github.com/rocky/python-uncompyle6/issues/208),
+* [#200: Python 3 bug in not detecting end bounds of an "if" ... "elif"](https://github.com/rocky/python-uncompyle6/issues/200),
+* [#155: Python 3.x bytecode confusing "try/else" with "try" in a loop](https://github.com/rocky/python-uncompyle6/issues/155),
+
 
 Pull Requests
 ----------------
 
-* [#202: Better "assert" statement detemination in Python 2.7](https://github.com/rocky/python-uncompyle6/pull/211)
+* [#202: Better "assert" statement determination in Python 2.7](https://github.com/rocky/python-uncompyle6/pull/211)
 * [#204: Python 3.7 testing](https://github.com/rocky/python-uncompyle6/pull/204)
 * [#205: Run more f-string tests on Python 3.7](https://github.com/rocky/python-uncompyle6/pull/205)
 * [#211: support utf-8 chars in Python 3 sourcecode](https://github.com/rocky/python-uncompyle6/pull/202)
 
 
 
-3.2.5 2018-12-30 Clearout sale
+3.2.5 2018-12-30 Clear-out sale
 ======================================
 
 - 3.7.2 Remove deprecation warning on regexp string that isn't raw
@@ -57,7 +170,7 @@ Pull Requests
 
 - Add rudimentary 1.4 support (still a bit buggy)
 - add --tree+ option to show formatting rule, when it is constant
-- Python 2.7.15candidate1 support (via xdis)
+- Python 2.7.15candidate1 support (via `xdis`)
 - bug fixes, especially for 3.7 (but 2.7 and 3.6 and others as well)
 
 3.1.3 2018-04-16
@@ -87,14 +200,14 @@ Jesus on Friday's New York Times puzzle: "I'm stuck on 2A"
 - reduce 3.5, 3.6 control-flow bugs
 - reduce ambiguity in rules that lead to long (exponential?) parses
 - limit/isolate some 2.6/2.7,3.x grammar rules
-- more runtime testing of decompiled code
-- more removal of parenthesis around calls via setting precidence
+- more run-time testing of decompiled code
+- more removal of parenthesis around calls via setting precedence
 
 3.1.0 2018-03-21 Equinox
 ==============================
 
 - Add code_deparse_with_offset() fragment function.
-- Correct paramenter call fragment deparse_code()
+- Correct parameter call fragment deparse_code()
 - Lots of 3.6, 3.x, and 2.7 bug fixes
   About 5% of 3.6 fail parsing now. But
   semantics still needs much to be desired.
@@ -162,24 +275,24 @@ function calls and definitions.
 2.15.1 2018-01-27
 =====================
 
-- Add --linemap option to give line correspondences
+- Add `--linemap` option to give line correspondences
   between original source lines and reconstructed line sources.
   It is far from perfect, but it is a start
 - Add a new class of tests: tests which when decompiled check themselves
 - Split off Python version semantic action customizations into its own file
-- Fix 2.7 bug in ifelse loop statement
-- Handle 3.6+ EXTENDED_ARGs for POP_JUMP_IF... instructions
-- Correct 3.6+ calls with kwargs
+- Fix 2.7 bug in `if`/`else` loop statement
+- Handle 3.6+ `EXTENDED_ARG`s for `POP_JUMP_IF..` instructions
+- Correct 3.6+ calls with `kwargs`
 - Describe the difficulty of 3.6 in README
 
 2.14.3 2018-01-19
 =====================
 
-- Fix bug in 3.5+ await stmt
+- Fix bug in 3.5+ `await` statement
 - Better version to magic handling; handle 3.5.2 .. 3.5.4 versions
 - Improve/correct test_pyenvlib.py status messages
 - Fix some 2.7 and 2.6 parser bugs
-- Fix whilelse parsing bugs
+- Fix `whilelse` parsing bugs
 - Correct 2.5- decorator parsing
 - grammar for decorators matches AST a little more
 - better tests in setup.py for running the right version of Python
@@ -190,15 +303,15 @@ function calls and definitions.
 
 Decompilation bug fixes, mostly 3.6 and pre 2.7
 
-- 3.6 FUNCTION_EX (somewhat)
-- 3.6 FUNCTION_EX_KW fixes
-- 3.6 MAKE_FUNCTION fixes
-- correct 3.5 CALL_FUNCTION_VAR
+- 3.6 `FUNCTION_EX` (somewhat)
+- 3.6 `FUNCTION_EX_KW` fixes
+- 3.6 `MAKE_FUNCTION` fixes
+- correct 3.5 `CALL_FUNCTION_VAR`
 - stronger 3.x "while 1" testing
 - Fix bug in if's with "pass" bodies. Fixes #104
 - try/else and try/finally fixes on 2.6-
 - limit pypy customization to pypy
-- Add addr fields in COME_FROMS
+- Add addr fields in `COME_FROM`S
 - Allow use of full instructions in parser reduction routines
 - Reduce grammar in Python 3 by specialization more to specific
   Python versions
@@ -207,11 +320,11 @@ Decompilation bug fixes, mostly 3.6 and pre 2.7
 2.14.1 2017-12-10 Dr. Gecko
 ===================================
 
-- Many decompilation bugfixes
+- Many decompilation bug fixes
 - Grammar rule reduction and version isolation
 - Match higher-level nonterminal names more closely
   with Python AST
-- Start automated Python stdlib testing - full round trip
+- Start automated Python _stdlib_ testing &mdash; full round trip
 
 2.14.0 2017-11-26 johnnybamazing
 =========================================
@@ -220,7 +333,7 @@ Decompilation bug fixes, mostly 3.6 and pre 2.7
   and remove used grammar rules
 - Fix a number of bytecode decompile problems
   (many more remain)
-- Add stdlib/runtests.sh for even more rigorous testing
+- Add `stdlib/runtests.sh` for even more rigorous testing
 
 2.13.3 2017-11-13
 =====================
@@ -236,16 +349,16 @@ Overall: better 3.6 decompiling and some much needed code refactoring and cleanu
   rather trying to parse the bytecode array. This largely been done in for versions 3.x;
   3.0 custom mangling code has been reduced;
   some 2.x conversion has been done, but more is desired. This make it possible to...
-- Handle EXTENDED_ARGS better. While relevant to all Python versions it is most noticeable in
-  version 3.6+ where in switching to wordcodes the size of operands has been reduced from 2**16
-  to 2**8. JUMP instruction then often need EXTENDED_ARGS.
+- Handle `EXTENDED_ARGS` better. While relevant to all Python versions it is most noticeable in
+  version 3.6+ where in switching to wordcodes the size of operands has been reduced from 2^16
+  to 2^8. `JUMP` instruction then often need EXTENDED_ARGS.
 - Refactor find_jump_targets() with via working of of instructions rather the bytecode array.
-- use --weak-verify more and additional fuzzing on verify()
+- use `--weak-verify` more and additional fuzzing on verify()
 - fragment parser now ignores errors in nested function definitions; an parameter was
   added to assist here. Ignoring errors may be okay because the fragment parser often just needs,
   well, *fragments*.
-- Distinguish RETURN_VALUE from RETURN_END_IF in exception bodies better in 3.6
-- bug in 3.x language changes: import queue via import Queue
+- Distinguish `RETURN_VALUE` from `RETURN_END_IF` in exception bodies better in 3.6
+- bug in 3.x language changes: import queue via `import Queue`
 - reinstate some bytecode tests since decompiling has gotten better
 - Revise how to report a bug
 
@@ -265,12 +378,12 @@ Overall: better 3.6 decompiling and some much needed code refactoring and cleanu
 - Fixes in deparsing lambda expressions
 - Improve table-semantics descriptions
 - Document hacky customize arg count better (until we can remove it)
-- Update to use xdis 3.7.0 or greater
+- Update to use `xdis` 3.7.0 or greater
 
 2.12.0 2017-09-26
 =====================
 
-- Use xdis 3.6.0 or greater now
+- Use `xdis` 3.6.0 or greater now
 - Small semantic table cleanups
 - Python 3.4's terms a little names better
 - Slightly more Python 3.7, but still failing a lot
@@ -284,13 +397,13 @@ Overall: better 3.6 decompiling and some much needed code refactoring and cleanu
 2.11.4 2017-08-15
 =====================
 
-* scanner and parser now allow 3-part version string lookups,
+* scanner and parser now allow 3-part version string look ups,
   e.g. 2.7.1 We allow a float here, but if passed a string like '2.7'. or
-* unpin 3.5.1. xdis 3.5.4 has been release and fixes the problems we had. Use that.
-* some routines here moved to xdis. Use the xdis version
-* README.rst: Link typo Name is trepan2 now not trepan
-* xdis-forced change adjust for COMPARE_OP "is-not" in
-  semanatic routines. We need "is not".
+* unpin 3.5.1. `xdis` 3.5.4 has been release and fixes the problems we had. Use that.
+* some routines here moved to `xdis`. Use the `xdis` version
+* `README.rst`: Link typo Name is _trepan2_ now not _trepan_
+* xdis-forced change adjust for `COMPARE_OP` "is-not" in
+  semantic routines. We need "is not".
 * Some PyPy tolerance in validate testing.
 * Some pyston tolerance
 
@@ -300,15 +413,15 @@ Overall: better 3.6 decompiling and some much needed code refactoring and cleanu
 Very minor changes
 
 - RsT doc fixes and updates
-- use newer xdis, but not too new; 3.5.2 breaks uncompyle6
-- use xdis opcode sets
-- xdis "exception match" is now "exception-match"
+- use newer `xdis`, but not too new; 3.5.2 breaks uncompyle6
+- use `xdis` opcode sets
+- `xdis` "exception match" is now "exception-match"
 
 2.11.2 2017-07-09
 =====================
 
 - Start supporting Pypy 3.5 (5.7.1-beta)
-- use xdis 3.5.0's opcode sets and require xdis 3.5.0
+- use `xdis` 3.5.0's opcode sets and require `xdis` 3.5.0
 - Correct some Python 2.4-2.6 loop detection
 - guard against badly formatted bytecode
 
@@ -316,55 +429,55 @@ Very minor changes
 =====================
 
 - Python 3.x annotation and function signature fixes
-- Bump xdis version
-- Small pysource bug fixes
+- Bump `xdis` version
+- Small `pysource.py` bug fixes
 
 2.11.0 2017-06-18 Fleetwood
 ==================================
 
 - Major improvements in fragment tracking
-  * Add nonterminal node in extractInfo
+  * Add nonterminal node in `extractInfo()`
   * tag more offsets in expressions
   * tag array subscripts
-  * set YIELD value offset in a <yield> expr
+  * set `YIELD` value offset in a _yield expr_
   * fix a long-standing bug in not adjusting final AST when melding other deparse ASTs
 - Fixes yet again for make_function node handling; document what's up here
-- Fix bug in snowflake Python 3.5 *args kwargs
+- Fix bug in snowflake Python 3.5 `*args`, `kwargs`
 
 2.10.1 2017-06-3 Marylin Frankel
 ========================================
 
 - fix some fragments parsing bugs
-  - was returning the wrong type sometimes in deparse_code_around_offset()
+  - was returning the wrong type sometimes in `deparse_code_around_offset()`
   - capture function name in offsets
-  - track changes to ifelstrmtr node from pysource into fragments
+  - track changes to `ifelstrmtr` node from `pysource.py` into fragments
 
 2.10.0 2017-05-30 Elaine Gordon
 =======================================
 
 - Add fuzzy offset deparse look up
 - 3.6 bug fixes
-   - fix EXTENDED_ARGS handling (and in 2.6 and others)
+   - fix `EXTENDED_ARGS` handling (and in 2.6 and others)
    - semantic routine make_function fragments.py
-   - MAKE_FUNCTION handling
-   - CALL_FUNCTION_EX handling
-   - async property on defs
-   - support for CALL_FUNCTION_KW (moagstar)
-- 3.5+ UNMAP_PACK and BUILD_UNMAP_PACK handling
+   - `MAKE_FUNCTION` handling
+   - `CALL_FUNCTION_EX` handling
+   - `async` property on `defs`
+   - support for `CALL_FUNCTION_KW` (moagstar)
+- 3.5+ `UNMAP_PACK` and` BUILD_UNMAP_PACK` handling
 - 3.5 FUNCTION_VAR bug
-- 3.x pass statement insdie while True
+- 3.x pass statement inside `while True`
 - Improve 3.2 decompilation
-- Fixed -o argument processing (grkov90)
+- Fixed `-o` argument processing (grkov90)
 - Reduce scope of LOAD_ASSERT as expr to 3.4+
-- "await" statement fixes
+- `await` statement fixes
 - 2.3, 2.4 "if 1 .." fixes
 - 3.x annotation fixes
 
 2.9.11 2017-04-06
 =====================
 
-- Better support for Python 3.5+ BUILD_MAP_UNPACK
-- Start 3.6 CALL_FUNCTION_EX support
+- Better support for Python 3.5+ `BUILD_MAP_UNPACK`
+- Start 3.6 `CALL_FUNCTION_EX` support
 - Many decompilation bug fixes. (Many more remain). See ChangeLog
 
 2.9.10 2017-02-25
@@ -372,7 +485,7 @@ Very minor changes
 
 - Python grammar rule fixes
 - Add ability to get grammar coverage on runs
-- Handle Python 3.6 opcode BUILD_CONST_KEYMAP
+- Handle Python 3.6 opcode `BUILD_CONST_KEYMAP`
 
 2.9.9 2016-12-16
 
@@ -388,13 +501,13 @@ Very minor changes
 ====================
 
 - Better control-flow detection
-- pseudo instruction THEN in 2.x
+- pseudo instruction `THEN` in 2.x
   to disambiguate if from and
-- fix bug in --verify option
+- fix bug in `--verify` option
 - DRY (a little) control-flow detection
 - fix syntax in tuples with one element
 - if AST rule inheritance in Python 2.5
-- NAME_MODULE removal for Python <= 2.4
+- `NAME_MODULE` removal for Python <= 2.4
 - verify call fixes for Python <= 2.4
 - more Python lint
 
@@ -405,9 +518,9 @@ Very minor changes
 - Some Python 3.6 bytecode to wordcode conversion fixes
 - option -g: show start-end range when possible
 - track print_docstring move to help (used in python 3.1)
-- verify: allow RETURN_VALUE to match RETURN_END_IF
+- verify: allow `RETURN_VALUE` to match `RETURN_END_IF`
 - some 3.2 compatibility
-- Better Python 3 control flow detection by adding Pseudo ELSE opcodes
+- Better Python 3 control flow detection by adding Pseudo `ELSE` opcodes
 
 2.9.6 2016-12-04
 ====================
@@ -423,7 +536,7 @@ Very minor changes
 
 - Correct MANIFEST.in
 - More AST grammar checking
-- --linemapping option or linenumbers.line_number_mapping()
+- `--linemapping` option or _linenumbers.line_number_mapping()_
   Shows correspondence of lines between source
   and decompiled source
 - Some control flow adjustments in code for 2.x.
@@ -443,7 +556,7 @@ Very minor changes
   * improper while 1 else
   * docstring indent
   * 3.3 default values in lambda expressions
-  * start 3.0 decompilation (needs newer xdis)
+  * start 3.0 decompilation (needs newer `xdis`)
 - Start grammar misparse checking
 
 
@@ -457,12 +570,12 @@ Very minor changes
 2.9.3 2016-10-26
 ====================
 
-Release forced by incompatibility change in xdis 3.2.0.
+Release forced by incompatibility change in` xdis` 3.2.0.
 
 - Python 3.1 bugs:
-  * handle "with ... as"
-  * handle "with"
-  * Start handling def (...) -> yy (has bugs still)
+  * handle `with`... `as`
+  * handle `with`
+  * Start handling `def` (...) -> _yy_ (has bugs still)
 
 - DRY Python 3.x via inheritance
 - Python 3.6 work (from Daniel Bradburn)
@@ -488,12 +601,12 @@ Release forced by incompatibility change in xdis 3.2.0.
 2.9.0 2016-10-09
 ====================
 
-- Use xdis 3.0.0 protocol load_module.
+- Use `xdis` 3.0.0 protocol `load_module`.
   this Forces change in requirements.txt and _pkg_info_.py
 - Start Python 1.5 decompiling; another round of work is needed to
   remove bugs
 - Simplify python 2.1 grammar
-- Fix bug with -t ...  Wasn't showing source text when -t option was given
+- Fix bug with `-t` ...  Wasn't showing source text when `-t` option was given
 - Fix 2.1-2.6 bug in list comprehension
 
 2.8.4 2016-10-08
@@ -502,8 +615,8 @@ Release forced by incompatibility change in xdis 3.2.0.
 - Python 3 disassembly bug fixes
 - Python 3.6 fstring bug fixes (from moagstar)
 - Python 2.1 disassembly
-- COME_FROM suffixes added in Python3
-- use .py extension in verification disassembly
+- `COME_FROM` suffixes added in Python3
+- use `.py` extension in verification disassembly
 
 2.8.3 2016-09-11 live from NYC!
 =======================================
@@ -548,8 +661,8 @@ control-flow structure detection is done.
 - Add Python 2.2 decompilation
 
 - Fix bugs
- * PyPy LOOKUP_METHOD bug
- * Python 3.6 FORMAT_VALUE handles expressions now
+ * PyPy `LOOKUP_METHOD` bug
+ * Python 3.6 `FORMAT_VALUE` handles expressions now
 
 2.8.0 2016-08-03
 ====================
@@ -599,7 +712,7 @@ control-flow structure detection is done.
 ====================
 
 - Improve Python 2.6 bytecode deparsing:
-  stdlib now will deparse something
+  _stdlib_ now will deparse something
 - Better <2.6 vs. 2.7 grammar separation
 - Fix some 2.7 deparsing bugs
 - Fix bug in installing uncompyle6 script
@@ -662,9 +775,9 @@ control-flow structure detection is done.
 2.3.2 2016-05-1
 ===================
 
-- Add --version option standalone scripts
+- Add `--version` option standalone scripts
 - Correct License information in package
-- expose fns uncompyle_file, load_file, and load_module
+- expose functions `uncompyle_file()`, `load_file()`, and `load_module()`
 - Start to DRY Python2 and Python3 grammars Separate out 3.2, and 3.5+
   specific grammar code
 - Fix bug in 3.5+ constant map parsing
@@ -672,12 +785,12 @@ control-flow structure detection is done.
 2.3.0, 2.3.1 2016-04-30
 =============================
 
-- Require spark_parser  >= 1.1.0
+- Require `spark_parser` >= 1.1.0
 
 2.2.0 2016-04-30
 ====================
 
-- Spark is no longer here but pulled separate package spark_parse
+- Spark is no longer here but pulled separate package [spark_parser](https://pypi.org/project/spark_parser/)
 - Python 3 parsing fixes
 - More tests
 
@@ -687,7 +800,7 @@ control-flow structure detection is done.
 - Support single-mode (in addition to exec-mode) compilation
 - Start to DRY Python 2 and Python 3 grammars
 - Fix bug in if else ternary  construct
-- Fix bug in uncomplye6 -d and -r options (via lelicopter)
+- Fix bug in uncomplye6 `-d` and `-r` options (via lelicopter)
 
 
 2.1.3 2016-01-02
@@ -695,7 +808,7 @@ control-flow structure detection is done.
 
 - Limited support for decompiling Python 3.5
 - Improve Python 3 class deparsing
-- Handle MAKE_CLOSURE opcode
+- Handle `MAKE_CLOSURE` opcode
 - Start to DRY opcode code.
 - increase test coverage
 - fix misc small bugs and some improvements
@@ -737,5 +850,5 @@ Changes from uncompyle2
 
 SPARK:
   add option to show grammar rules applied
-  allow Python-style # comments in grammar
+  allow Python-style `#` comments in grammar
   Runs on Python 3 and Python 2

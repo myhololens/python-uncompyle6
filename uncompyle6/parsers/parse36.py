@@ -30,8 +30,15 @@ class Python36Parser(Python35Parser):
 
 
     def p_36misc(self, args):
-        """
-        sstmt ::= sstmt RETURN_LAST
+        """sstmt ::= sstmt RETURN_LAST
+
+        # long except clauses in a loop can sometimes cause a JUMP_BACK to turn into a
+        # JUMP_FORWARD to a JUMP_BACK. And when this happens there is an additional
+        # ELSE added to the except_suite. With better flow control perhaps we can
+        # sort this out better.
+        except_suite ::= c_stmts_opt POP_EXCEPT jump_except ELSE
+        except_suite_finalize ::= SETUP_FINALLY c_stmts_opt except_var_finalize END_FINALLY
+                                  _jump ELSE
 
         # 3.6 redoes how return_closure works. FIXME: Isolate to LOAD_CLOSURE
         return_closure   ::= LOAD_CLOSURE DUP_TOP STORE_NAME RETURN_VALUE RETURN_LAST
@@ -41,6 +48,8 @@ class Python36Parser(Python35Parser):
 
         whilestmt       ::= SETUP_LOOP testexpr l_stmts_opt
                             JUMP_BACK come_froms POP_BLOCK COME_FROM_LOOP
+        whilestmt       ::= SETUP_LOOP testexpr l_stmts_opt
+                            come_froms JUMP_BACK come_froms POP_BLOCK COME_FROM_LOOP
 
         # 3.6 due to jump optimization, we sometimes add RETURN_END_IF where
         # RETURN_VALUE is meant. Specifcally this can happen in
@@ -54,6 +63,8 @@ class Python36Parser(Python35Parser):
         and  ::= expr jmp_false expr jmp_false
 
         jf_cf       ::= JUMP_FORWARD COME_FROM
+        cf_jf_else  ::= come_froms JUMP_FORWARD ELSE
+
         conditional ::= expr jmp_false expr jf_cf expr COME_FROM
 
         async_for_stmt     ::= SETUP_LOOP expr
@@ -66,6 +77,22 @@ class Python36Parser(Python35Parser):
                                POP_TOP POP_TOP POP_TOP POP_EXCEPT POP_BLOCK
                                JUMP_ABSOLUTE END_FINALLY COME_FROM
                                for_block POP_BLOCK
+                               COME_FROM_LOOP
+
+        stmt      ::= async_for_stmt36
+
+        async_for_stmt36   ::= SETUP_LOOP expr
+                               GET_AITER
+                               LOAD_CONST YIELD_FROM
+                               SETUP_EXCEPT GET_ANEXT LOAD_CONST
+                               YIELD_FROM
+                               store
+                               POP_BLOCK JUMP_BACK COME_FROM_EXCEPT DUP_TOP
+                               LOAD_GLOBAL COMPARE_OP POP_JUMP_IF_TRUE
+                               END_FINALLY for_block
+                               COME_FROM
+                               POP_TOP POP_TOP POP_TOP POP_EXCEPT
+                               POP_TOP POP_BLOCK
                                COME_FROM_LOOP
 
         async_forelse_stmt ::= SETUP_LOOP expr
@@ -87,6 +114,7 @@ class Python36Parser(Python35Parser):
 
         jb_cfs      ::= JUMP_BACK come_froms
         ifelsestmtl ::= testexpr c_stmts_opt jb_cfs else_suitel
+        ifelsestmtl ::= testexpr c_stmts_opt cf_jf_else else_suitel
 
         # In 3.6+, A sequence of statements ending in a RETURN can cause
         # JUMP_FORWARD END_FINALLY to be omitted from try middle
@@ -101,9 +129,12 @@ class Python36Parser(Python35Parser):
         try_except36     ::= SETUP_EXCEPT returns except_handler36
                              opt_come_from_except
         try_except36     ::= SETUP_EXCEPT suite_stmts
+        try_except36     ::= SETUP_EXCEPT suite_stmts_opt POP_BLOCK
+                             except_handler36 opt_come_from_except
 
         # 3.6 omits END_FINALLY sometimes
         except_handler36 ::= COME_FROM_EXCEPT except_stmts
+        except_handler36 ::= JUMP_FORWARD COME_FROM_EXCEPT except_stmts
         except_handler   ::= jmp_abs COME_FROM_EXCEPT except_stmts
 
         stmt             ::= tryfinally36
@@ -117,6 +148,9 @@ class Python36Parser(Python35Parser):
         stmt ::= tryfinally_return_stmt
         tryfinally_return_stmt ::= SETUP_FINALLY suite_stmts_opt POP_BLOCK LOAD_CONST
                                    COME_FROM_FINALLY
+
+        compare_chained2 ::= expr COMPARE_OP come_froms JUMP_FORWARD
+
         """
 
     def customize_grammar_rules(self, tokens, customize):
@@ -147,30 +181,43 @@ class Python36Parser(Python35Parser):
                                   JUMP_ABSOLUTE END_FINALLY COME_FROM
                                   for_block pb_ja
                                   else_suite COME_FROM_LOOP
+
         """)
         self.check_reduce['call_kw'] = 'AST'
 
         for i, token in enumerate(tokens):
             opname = token.kind
 
-            if opname == 'FORMAT_VALUE':
+            if opname == 'LOAD_ASSERT':
+                if 'PyPy' in customize:
+                    rules_str = """
+                    stmt ::= JUMP_IF_NOT_DEBUG stmts COME_FROM
+                    """
+                    self.add_unique_doc_rules(rules_str, customize)
+            elif opname == 'FORMAT_VALUE':
                 rules_str = """
-                    expr ::= fstring_single
-                    fstring_single ::= expr FORMAT_VALUE
+                    expr              ::= formatted_value1
+                    formatted_value1  ::= expr FORMAT_VALUE
+                """
+                self.add_unique_doc_rules(rules_str, customize)
+            elif opname == 'FORMAT_VALUE_ATTR':
+                rules_str = """
+                expr              ::= formatted_value2
+                formatted_value2  ::= expr expr FORMAT_VALUE_ATTR
                 """
                 self.add_unique_doc_rules(rules_str, customize)
             elif opname == 'MAKE_FUNCTION_8':
                 if 'LOAD_DICTCOMP' in self.seen_ops:
                     # Is there something general going on here?
                     rule = """
-                       dict_comp ::= load_closure LOAD_DICTCOMP LOAD_CONST
+                       dict_comp ::= load_closure LOAD_DICTCOMP LOAD_STR
                                      MAKE_FUNCTION_8 expr
                                      GET_ITER CALL_FUNCTION_1
                        """
                     self.addRule(rule, nop_func)
                 elif 'LOAD_SETCOMP' in self.seen_ops:
                     rule = """
-                       set_comp ::= load_closure LOAD_SETCOMP LOAD_CONST
+                       set_comp ::= load_closure LOAD_SETCOMP LOAD_STR
                                     MAKE_FUNCTION_8 expr
                                     GET_ITER CALL_FUNCTION_1
                        """
@@ -200,23 +247,19 @@ class Python36Parser(Python35Parser):
                 """
                 self.addRule(rules_str, nop_func)
 
-            elif opname == 'BUILD_STRING':
+            elif opname.startswith('BUILD_STRING'):
                 v = token.attr
-                joined_str_n = "formatted_value_%s" % v
                 rules_str = """
-                    expr            ::= fstring_expr
-                    fstring_expr    ::= expr FORMAT_VALUE
-                    str             ::= LOAD_CONST
-                    formatted_value ::= fstring_expr
-                    formatted_value ::= str
-
-                    expr                 ::= fstring_multi
-                    fstring_multi        ::= joined_str BUILD_STRING
-                    joined_str           ::= formatted_value+
-                    fstring_multi        ::= %s BUILD_STRING
-                    %s                   ::= %sBUILD_STRING
-                """ % (joined_str_n, joined_str_n, "formatted_value " * v)
+                    expr                 ::= joined_str
+                    joined_str           ::= %sBUILD_STRING_%d
+                """ % ("expr " * v, v)
                 self.add_unique_doc_rules(rules_str, customize)
+                if 'FORMAT_VALUE_ATTR' in self.seen_ops:
+                    rules_str = """
+                      formatted_value_attr ::= expr expr FORMAT_VALUE_ATTR expr BUILD_STRING
+                      expr                 ::= formatted_value_attr
+                    """
+                    self.add_unique_doc_rules(rules_str, customize)
             elif opname.startswith('BUILD_MAP_UNPACK_WITH_CALL'):
                 v = token.attr
                 rule = 'build_map_unpack_with_call ::= %s%s' % ('expr ' * v, opname)
@@ -229,10 +272,25 @@ class Python36Parser(Python35Parser):
                 self.addRule(rule, nop_func)
                 rule = ('starred ::= %s %s' % ('expr ' * v, opname))
                 self.addRule(rule, nop_func)
+            elif opname == 'SETUP_ANNOTATIONS':
+                # 3.6 Variable Annotations PEP 526
+                # This seems to come before STORE_ANNOTATION, and doesn't
+                # correspond to direct Python source code.
+                rule = """
+                    stmt ::= SETUP_ANNOTATIONS
+                    stmt ::= ann_assign_init_value
+                    stmt ::= ann_assign_no_init
+
+                    ann_assign_init_value ::= expr store store_annotation
+                    ann_assign_no_init    ::= store_annotation
+                    store_annotation      ::= LOAD_NAME STORE_ANNOTATION
+                    store_annotation      ::= subscript STORE_ANNOTATION
+                 """
+                self.addRule(rule, nop_func)
+                # Check to combine assignment + annotation into one statement
+                self.check_reduce['assign'] = 'token'
             elif opname == 'SETUP_WITH':
                 rules_str = """
-                withstmt   ::= expr SETUP_WITH POP_TOP suite_stmts_opt POP_BLOCK LOAD_CONST
-                               WITH_CLEANUP_START WITH_CLEANUP_FINISH END_FINALLY
                 withstmt   ::= expr SETUP_WITH POP_TOP suite_stmts_opt COME_FROM_WITH
                                WITH_CLEANUP_START WITH_CLEANUP_FINISH END_FINALLY
 
@@ -240,9 +298,23 @@ class Python36Parser(Python35Parser):
                 withasstmt ::= expr SETUP_WITH store suite_stmts_opt COME_FROM_WITH
                                WITH_CLEANUP_START WITH_CLEANUP_FINISH END_FINALLY
                 """
+                if self.version < 3.8:
+                    rules_str += """
+                    withstmt   ::= expr SETUP_WITH POP_TOP suite_stmts_opt POP_BLOCK
+                                   LOAD_CONST
+                                   WITH_CLEANUP_START WITH_CLEANUP_FINISH END_FINALLY
+                    """
+                else:
+                    rules_str += """
+                    withstmt   ::= expr SETUP_WITH POP_TOP suite_stmts_opt POP_BLOCK
+                                   BEGIN_FINALLY COME_FROM_WITH
+                                   WITH_CLEANUP_START WITH_CLEANUP_FINISH
+                                   END_FINALLY
+                    """
                 self.addRule(rules_str, nop_func)
                 pass
             pass
+        return
 
     def custom_classfunc_rule(self, opname, token, customize, next_token):
 
@@ -321,7 +393,7 @@ class Python36Parser(Python35Parser):
                                             build_tuple_unpack_with_call
                                             %s
                                             CALL_FUNCTION_EX
-                            """ % 'expr '* token.attr, nop_func)
+                            """ % 'expr ' * token.attr, nop_func)
                     pass
 
                 # FIXME: Is this right?
@@ -342,6 +414,15 @@ class Python36Parser(Python35Parser):
                                                 tokens, first, last)
         if invalid:
             return invalid
+        if rule[0] == 'assign':
+            # Try to combine assignment + annotation into one statement
+            if (len(tokens) >= last + 1 and
+                tokens[last] == 'LOAD_NAME' and
+                tokens[last+1] == 'STORE_ANNOTATION' and
+                tokens[last-1].pattr == tokens[last+1].pattr):
+                # Will handle as ann_assign_init_value
+                return True
+            pass
         if rule[0] == 'call_kw':
             # Make sure we don't derive call_kw
             nt = ast[0]
@@ -352,6 +433,7 @@ class Python36Parser(Python35Parser):
                 pass
             pass
         return False
+
 class Python36ParserSingle(Python36Parser, PythonParserSingle):
     pass
 

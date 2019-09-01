@@ -287,6 +287,8 @@ class Scanner2(Scanner):
                             op_name = 'LOAD_DICTCOMP'
                         elif const.co_name == '<setcomp>':
                             op_name = 'LOAD_SETCOMP'
+                        else:
+                            op_name = "LOAD_CODE"
                         # verify() uses 'pattr' for comparison, since 'attr'
                         # now holds Code(const) and thus can not be used
                         # for comparison (todo: think about changing this)
@@ -1179,7 +1181,7 @@ class Scanner2(Scanner):
         Return a list with indexes to them or [] if none found.
         """
 
-        assert(start>=0 and end<=len(self.code) and start <= end)
+        assert(start >= 0 and end <= len(self.code) and start <= end)
 
         try:    None in instr
         except: instr = [instr]

@@ -1,7 +1,7 @@
 # We have to do contortions here because
 # lambda's have to be more or less on a line
 
-f = lambda x: 1 if x<2 else 3
+f = lambda x: 1 if x < 2 else 3
 assert f(3) == 3
 assert f(1) == 1
 
@@ -22,7 +22,7 @@ assert i[0]('a') == True
 assert i[0]('A') == False
 
 # Issue #170. Bug is needing an "conditional_not_lambda" grammar rule
-# in addition the the "conditional_lambda" rule
+# in addition the the "if_expr_lambda" rule
 j = lambda a: False if not a else True
 assert j(True) == True
 assert j(False) == False

@@ -1,4 +1,4 @@
-# Copyright (C) 2018 Rocky Bernstein <rocky@gnu.org>
+# Copyright (C) 2018-2019 Rocky Bernstein <rocky@gnu.org>
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from __future__ import print_function
-import datetime, os, subprocess, sys, tempfile
+import datetime, py_compile, os, subprocess, sys, tempfile
 
 from uncompyle6 import verify, IS_PYPY, PYTHON_VERSION
 from xdis.code import iscode
@@ -45,10 +45,21 @@ def _get_outstream(outfile):
         return open(outfile, mode='w', encoding='utf-8')
 
 def decompile(
-        bytecode_version, co, out=None, showasm=None, showast=False,
-        timestamp=None, showgrammar=False, code_objects={},
-        source_size=None, is_pypy=None, magic_int=None,
-        mapstream=None, do_fragments=False):
+    bytecode_version,
+    co,
+    out=None,
+    showasm=None,
+    showast={},
+    timestamp=None,
+    showgrammar=False,
+    source_encoding=None,
+    code_objects={},
+    source_size=None,
+    is_pypy=None,
+    magic_int=None,
+    mapstream=None,
+    do_fragments=False,
+):
     """
     ingests and deparses a given code block 'co'
 
@@ -72,6 +83,8 @@ def decompile(
     co_pypy_str = 'PyPy ' if is_pypy else ''
     run_pypy_str = 'PyPy ' if IS_PYPY else ''
     sys_version_lines = sys.version.split('\n')
+    if source_encoding:
+        write('# -*- coding: %s -*-' % source_encoding)
     write('# uncompyle6 version %s\n'
           '# %sPython bytecode %s%s\n# Decompiled from: %sPython %s' %
           (VERSION, co_pypy_str, bytecode_version,
@@ -119,8 +132,24 @@ def decompile(
         # deparsing failed
         raise pysource.SourceWalkerError(str(e))
 
+def compile_file(source_path):
+    if source_path.endswith('.py'):
+        basename = source_path[:-3]
+    else:
+        basename = source_path
+
+    if hasattr(sys, 'pypy_version_info'):
+        bytecode_path = "%s-pypy%s.pyc" % (basename, PYTHON_VERSION)
+    else:
+        bytecode_path = "%s-%s.pyc" % (basename, PYTHON_VERSION)
+
+    print("compiling %s to %s" % (source_path, bytecode_path))
+    py_compile.compile(source_path, bytecode_path, 'exec')
+    return bytecode_path
+
+
 def decompile_file(filename, outstream=None, showasm=None, showast=False,
-                   showgrammar=False, mapstream=None, do_fragments=False):
+                   showgrammar=False, source_encoding=None, mapstream=None, do_fragments=False):
     """
     decompile Python byte-code file (.pyc). Return objects to
     all of the deparsed objects found in `filename`.
@@ -136,12 +165,12 @@ def decompile_file(filename, outstream=None, showasm=None, showast=False,
         for con in co:
             deparsed.append(
                 decompile(version, con, outstream, showasm, showast,
-                          timestamp, showgrammar, code_objects=code_objects,
+                          timestamp, showgrammar, source_encoding, code_objects=code_objects,
                           is_pypy=is_pypy, magic_int=magic_int),
                           mapstream=mapstream)
     else:
         deparsed = [decompile(version, co, outstream, showasm, showast,
-                              timestamp, showgrammar,
+                              timestamp, showgrammar, source_encoding,
                               code_objects=code_objects, source_size=source_size,
                               is_pypy=is_pypy, magic_int=magic_int,
                               mapstream=mapstream, do_fragments=do_fragments)]
@@ -150,17 +179,15 @@ def decompile_file(filename, outstream=None, showasm=None, showast=False,
 
 
 # FIXME: combine into an options parameter
-def main(in_base, out_base, files, codes, outfile=None,
+def main(in_base, out_base, compiled_files, source_files, outfile=None,
          showasm=None, showast=False, do_verify=False,
-         showgrammar=False, raise_on_error=False,
+         showgrammar=False, source_encoding=None, raise_on_error=False,
          do_linemaps=False, do_fragments=False):
     """
     in_base	base directory for input files
     out_base	base directory for output files (ignored when
     files	list of filenames to be uncompyled (relative to in_base)
     outfile	write output to this filename (overwrites out_base)
-
-    Note: `codes` is not use. Historical compatability?
 
     For redirecting output to
     - <filename>		outfile=<filename> (out_base is ignored)
@@ -171,7 +198,10 @@ def main(in_base, out_base, files, codes, outfile=None,
     current_outfile = outfile
     linemap_stream = None
 
-    for filename in files:
+    for source_path in source_files:
+        compiled_files.append(compile_file(source_path))
+
+    for filename in compiled_files:
         infile = os.path.join(in_base, filename)
         # print("XXX", infile)
         if not os.path.exists(infile):
@@ -228,7 +258,7 @@ def main(in_base, out_base, files, codes, outfile=None,
         # Try to uncompile the input file
         try:
             deparsed = decompile_file(infile, outstream, showasm, showast, showgrammar,
-                                      linemap_stream, do_fragments)
+                                      source_encoding, linemap_stream, do_fragments)
             if do_fragments:
                 for d in deparsed:
                     last_mod = None
@@ -258,11 +288,24 @@ def main(in_base, out_base, files, codes, outfile=None,
             sys.stdout.write("\n")
             sys.stderr.write("\nLast file: %s   " % (infile))
             raise
+        except RuntimeError as e:
+            sys.stdout.write("\n%s\n" % str(e))
+            if str(e).startswith('Unsupported Python'):
+                sys.stdout.write("\n")
+                sys.stderr.write("\n# Unsupported bytecode in file %s\n# %s\n" % (infile, e))
+            else:
+                if outfile:
+                    outstream.close()
+                    os.remove(outfile)
+                sys.stdout.write("\n")
+                sys.stderr.write("\nLast file: %s   " % (infile))
+                raise
+
         # except:
         #     failed_files += 1
         #     if current_outfile:
         #         outstream.close()
-        #         os.rename(current_outfile, current_outfile + '_failed')
+        #         os.rename(current_outfile, current_outfile + "_failed")
         #     else:
         #         sys.stderr.write("\n# %s" % sys.exc_info()[1])
         #         sys.stderr.write("\n# Can't uncompile %s\n" % infile)
@@ -311,9 +354,9 @@ def main(in_base, out_base, files, codes, outfile=None,
                     # mem_usage = __memUsage()
                     print(mess, infile)
         if current_outfile:
-            sys.stdout.write("%s\r" %
-                             status_msg(do_verify, tot_files, okay_files, failed_files,
-                                        verify_failed_files, do_verify))
+            sys.stdout.write("%s -- %s\r" %
+                             (infile, status_msg(do_verify, tot_files, okay_files, failed_files,
+                                                 verify_failed_files, do_verify)))
             try:
                 # FIXME: Something is weird with Pypy here
                 sys.stdout.flush()

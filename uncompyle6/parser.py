@@ -1,4 +1,4 @@
-#  Copyright (c) 2015-2018 Rocky Bernstein
+#  Copyright (c) 2015-2019 Rocky Bernstein
 #  Copyright (c) 2005 by Dan Pascu <dan@windowmaker.org>
 #  Copyright (c) 2000-2002 by hartmut Goebel <h.goebel@crazy-compilers.com>
 #  Copyright (c) 1999 John Aycock
@@ -61,7 +61,6 @@ class PythonParser(GenericASTBuilder):
             'imports_cont',
             'kvlist_n',
             # Python 3.6+
-            'joined_str',
             'come_from_loops',
             ]
         self.collect = frozenset(nt_list)
@@ -83,7 +82,7 @@ class PythonParser(GenericASTBuilder):
         # FIXME: would love to do expr, sstmts, stmts and
         # so on but that would require major changes to the
         # semantic actions
-        self.singleton = frozenset(('str', 'joined_str', 'store', '_stmts', 'suite_stmts_opt',
+        self.singleton = frozenset(('str', 'store', '_stmts', 'suite_stmts_opt',
                                     'inplace_op'))
         # Instructions filled in from scanner
         self.insts = []
@@ -499,6 +498,7 @@ class PythonParser(GenericASTBuilder):
     def p_expr(self, args):
         '''
         expr ::= _mklambda
+        expr ::= LOAD_CODE
         expr ::= LOAD_FAST
         expr ::= LOAD_NAME
         expr ::= LOAD_CONST
@@ -589,14 +589,14 @@ class PythonParser(GenericASTBuilder):
         ##   designLists ::=
         ## Will need to redo semantic actiion
 
-        store        ::= STORE_FAST
-        store        ::= STORE_NAME
-        store        ::= STORE_GLOBAL
-        store        ::= STORE_DEREF
-        store        ::= expr STORE_ATTR
-        store        ::= store_subscr
-        store_subscr ::= expr expr STORE_SUBSCR
-        store        ::= unpack
+        store           ::= STORE_FAST
+        store           ::= STORE_NAME
+        store           ::= STORE_GLOBAL
+        store           ::= STORE_DEREF
+        store           ::= expr STORE_ATTR
+        store           ::= store_subscript
+        store_subscript ::= expr expr STORE_SUBSCR
+        store           ::= unpack
         '''
 
 
@@ -747,6 +747,12 @@ def get_python_parser(
                 p = parse37.Python37Parser(debug_parser)
             else:
                 p = parse37.Python37ParserSingle(debug_parser)
+        elif version == 3.8:
+            import uncompyle6.parsers.parse38 as parse38
+            if compile_mode == 'exec':
+                p = parse38.Python38Parser(debug_parser)
+            else:
+                p = parse38.Python38ParserSingle(debug_parser)
         else:
             if compile_mode == 'exec':
                 p = parse3.Python3Parser(debug_parser)
@@ -798,7 +804,6 @@ def python_parser(version, co, out=sys.stdout, showasm=False,
 if __name__ == '__main__':
     def parse_test(co):
         from uncompyle6 import PYTHON_VERSION, IS_PYPY
-        ast = python_parser('2.7.13', co, showasm=True, is_pypy=True)
         ast = python_parser(PYTHON_VERSION, co, showasm=True, is_pypy=IS_PYPY)
         print(ast)
         return

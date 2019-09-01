@@ -31,6 +31,7 @@ class Python37Parser(Python36Parser):
         """
         # Where does the POP_TOP really belong?
         stmt     ::= import37
+        stmt     ::= async_for_stmt37
         import37 ::= import POP_TOP
 
         async_for_stmt     ::= SETUP_LOOP expr
@@ -46,6 +47,19 @@ class Python37Parser(Python36Parser):
                                POP_TOP POP_TOP POP_TOP POP_EXCEPT POP_TOP POP_BLOCK
                                COME_FROM_LOOP
 
+        # Order of LOAD_CONST YIELD_FROM is switched from 3.6 to save a LOAD_CONST
+        async_for_stmt37   ::= SETUP_LOOP expr
+                               GET_AITER
+                               SETUP_EXCEPT GET_ANEXT
+                               LOAD_CONST YIELD_FROM
+                               store
+                               POP_BLOCK JUMP_BACK COME_FROM_EXCEPT DUP_TOP
+                               LOAD_GLOBAL COMPARE_OP POP_JUMP_IF_TRUE
+                               END_FINALLY for_block COME_FROM
+                               POP_TOP POP_TOP POP_TOP POP_EXCEPT
+                               POP_TOP POP_BLOCK
+                               COME_FROM_LOOP
+
         async_forelse_stmt ::= SETUP_LOOP expr
                                GET_AITER
                                SETUP_EXCEPT GET_ANEXT LOAD_CONST
@@ -59,25 +73,71 @@ class Python37Parser(Python36Parser):
                                POP_TOP POP_TOP POP_TOP POP_EXCEPT POP_TOP POP_BLOCK
                                else_suite COME_FROM_LOOP
 
-        # Is there a pattern here?
         attributes ::= IMPORT_FROM ROT_TWO POP_TOP IMPORT_FROM
+        attributes ::= attributes ROT_TWO POP_TOP IMPORT_FROM
 
         attribute37   ::= expr LOAD_METHOD
         expr          ::= attribute37
+
+        # long except clauses in a loop can sometimes cause a JUMP_BACK to turn into a
+        # JUMP_FORWARD to a JUMP_BACK. And when this happens there is an additional
+        # ELSE added to the except_suite. With better flow control perhaps we can
+        # sort this out better.
+        except_suite ::= c_stmts_opt POP_EXCEPT jump_except ELSE
 
         # FIXME: generalize and specialize
         call        ::= expr CALL_METHOD_0
 
         testtrue         ::= compare_chained37
+        testfalse        ::= compare_chained37_false
+
 
         compare_chained37   ::= expr compare_chained1a_37
         compare_chained37   ::= expr compare_chained1b_37
-        compare_chained2a_37 ::= expr COMPARE_OP POP_JUMP_IF_TRUE JUMP_FORWARD
-        compare_chained2b_37 ::= expr COMPARE_OP COME_FROM POP_JUMP_IF_FALSE JUMP_FORWARD ELSE
-        compare_chained1a_37 ::= expr DUP_TOP ROT_THREE COMPARE_OP POP_JUMP_IF_FALSE
-                                 compare_chained2a_37  ELSE POP_TOP COME_FROM
-        compare_chained1b_37 ::= expr DUP_TOP ROT_THREE COMPARE_OP POP_JUMP_IF_FALSE
-                                 compare_chained2b_37 POP_TOP JUMP_FORWARD COME_FROM
+        compare_chained37   ::= expr compare_chained1c_37
+
+        compare_chained37_false  ::= expr compare_chained1_false_37
+        compare_chained37_false  ::= expr compare_chained2_false_37
+
+        compare_chained1a_37      ::= expr DUP_TOP ROT_THREE COMPARE_OP POP_JUMP_IF_FALSE
+        compare_chained1a_37      ::= expr DUP_TOP ROT_THREE COMPARE_OP POP_JUMP_IF_FALSE
+                                      compare_chained2a_37 ELSE POP_TOP COME_FROM
+        compare_chained1b_37      ::= expr DUP_TOP ROT_THREE COMPARE_OP POP_JUMP_IF_FALSE
+                                      compare_chained2b_37 POP_TOP JUMP_FORWARD COME_FROM
+        compare_chained1c_37      ::= expr DUP_TOP ROT_THREE COMPARE_OP POP_JUMP_IF_FALSE
+                                      compare_chained2a_37 POP_TOP
+
+        compare_chained1_false_37 ::= expr DUP_TOP ROT_THREE COMPARE_OP POP_JUMP_IF_FALSE
+                                      compare_chained2c_37 POP_TOP JUMP_FORWARD COME_FROM
+        compare_chained2_false_37 ::= expr DUP_TOP ROT_THREE COMPARE_OP POP_JUMP_IF_FALSE
+                                      compare_chained2a_false_37 ELSE POP_TOP JUMP_BACK COME_FROM
+
+        compare_chained2a_37       ::= expr COMPARE_OP POP_JUMP_IF_TRUE JUMP_FORWARD
+        compare_chained2a_37       ::= expr COMPARE_OP POP_JUMP_IF_TRUE JUMP_BACK
+        compare_chained2a_false_37 ::= expr COMPARE_OP POP_JUMP_IF_FALSE jf_cfs
+
+        compare_chained2b_37       ::= expr COMPARE_OP come_from_opt POP_JUMP_IF_FALSE JUMP_FORWARD ELSE
+        compare_chained2b_37       ::= expr COMPARE_OP come_from_opt POP_JUMP_IF_FALSE JUMP_FORWARD
+
+        compare_chained2c_37       ::= expr DUP_TOP ROT_THREE COMPARE_OP come_from_opt POP_JUMP_IF_FALSE
+                                       compare_chained2a_false_37 ELSE
+        compare_chained2c_37       ::= expr DUP_TOP ROT_THREE COMPARE_OP come_from_opt POP_JUMP_IF_FALSE
+                                       compare_chained2a_false_37
+
+        jf_cfs                     ::= JUMP_FORWARD _come_froms
+        ifelsestmt                 ::= testexpr c_stmts_opt jf_cfs else_suite opt_come_from_except
+
+        jmp_false37                ::= POP_JUMP_IF_FALSE COME_FROM
+        list_if                    ::= expr jmp_false37 list_iter
+
+        _ifstmts_jump              ::= c_stmts_opt come_froms
+
+        and_not                    ::= expr jmp_false expr POP_JUMP_IF_TRUE
+
+        expr                       ::= if_exp_37a
+        expr                       ::= if_exp_37b
+        if_exp_37a                 ::= and_not expr JUMP_FORWARD COME_FROM expr COME_FROM
+        if_exp_37b                 ::= expr jmp_false expr POP_JUMP_IF_FALSE jump_forward_else expr
         """
 
     def customize_grammar_rules(self, tokens, customize):
@@ -93,6 +153,18 @@ class Python37Parser(Python36Parser):
                                  JUMP_ABSOLUTE END_FINALLY COME_FROM
                                  for_block POP_BLOCK
                                  else_suite COME_FROM_LOOP
+        stmt      ::= async_for_stmt36
+        async_for_stmt36   ::= SETUP_LOOP expr
+                               GET_AITER
+                               LOAD_CONST YIELD_FROM SETUP_EXCEPT GET_ANEXT LOAD_CONST
+                               YIELD_FROM
+                               store
+                               POP_BLOCK JUMP_BACK COME_FROM_EXCEPT DUP_TOP
+                               LOAD_GLOBAL COMPARE_OP POP_JUMP_IF_TRUE
+                               END_FINALLY continues COME_FROM
+                               POP_TOP POP_TOP POP_TOP POP_EXCEPT
+                               POP_TOP POP_BLOCK
+                               COME_FROM_LOOP
         """)
         super(Python37Parser, self).customize_grammar_rules(tokens, customize)
 

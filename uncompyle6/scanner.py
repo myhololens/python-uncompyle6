@@ -1,4 +1,4 @@
-#  Copyright (c) 2016, 2018 by Rocky Bernstein
+#  Copyright (c) 2016, 2018-2019 by Rocky Bernstein
 #  Copyright (c) 2005 by Dan Pascu <dan@windowmaker.org>
 #  Copyright (c) 2000-2002 by hartmut Goebel <h.goebel@crazy-compilers.com>
 #  Copyright (c) 1999 John Aycock
@@ -39,7 +39,7 @@ from xdis.util import code2num
 # Note: these all have to be floats
 PYTHON_VERSIONS = frozenset((1.3, 1.4, 1.5,
                              2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7,
-                             3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7))
+                             3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8))
 
 CANONIC2VERSION = dict((canonic_python_version[str(v)], v) for v in PYTHON_VERSIONS)
 
@@ -271,7 +271,7 @@ class Scanner(object):
         code = self.code
         # Make sure requested positions do not go out of
         # code bounds
-        if not (start>=0 and end<=len(code)):
+        if not (start >= 0 and end <= len(code)):
             return None
 
         try:
@@ -435,7 +435,7 @@ class Scanner(object):
                 # j = self.stmts.index(inst.offset)
                 # self.lines[j] = offset
 
-                new_inst= inst._replace(starts_line=starts_line,
+                new_inst = inst._replace(starts_line=starts_line,
                                         is_jump_target=is_jump_target,
                                         offset=offset)
                 inst = new_inst

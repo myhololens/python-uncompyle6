@@ -17,14 +17,9 @@ spark grammar differences over Python 3.3 for Python 3.4
 """
 
 from uncompyle6.parser import PythonParserSingle
-from spark_parser import DEFAULT_DEBUG as PARSER_DEFAULT_DEBUG
 from uncompyle6.parsers.parse33 import Python33Parser
 
 class Python34Parser(Python33Parser):
-
-    def __init__(self, debug_parser=PARSER_DEFAULT_DEBUG):
-        super(Python34Parser, self).__init__(debug_parser)
-        self.customized = {}
 
     def p_misc34(self, args):
         """
@@ -33,6 +28,8 @@ class Python34Parser(Python33Parser):
 
         # passtmt is needed for semantic actions to add "pass"
         suite_stmts_opt ::= pass
+
+        whilestmt     ::= SETUP_LOOP testexpr returns come_froms POP_BLOCK COME_FROM_LOOP
 
         # Seems to be needed starting 3.4.4 or so
         while1stmt    ::= SETUP_LOOP l_stmts
@@ -45,12 +42,12 @@ class Python34Parser(Python33Parser):
         whileelsestmt     ::= SETUP_LOOP testexpr l_stmts_opt JUMP_BACK POP_BLOCK
                               else_suitel COME_FROM
 
-        while1elsestmt    ::= SETUP_LOOP l_stmts JUMP_BACK POP_BLOCK else_suitel
+        while1elsestmt    ::= SETUP_LOOP l_stmts JUMP_BACK _come_froms POP_BLOCK else_suitel
                               COME_FROM_LOOP
 
         # Python 3.4+ optimizes the trailing two JUMPS away
 
-        # Is this 3.4 only?
+        # This is 3.4 only
         yield_from ::= expr GET_ITER LOAD_CONST YIELD_FROM
 
         _ifstmts_jump ::= c_stmts_opt JUMP_ABSOLUTE JUMP_FORWARD COME_FROM
@@ -58,6 +55,7 @@ class Python34Parser(Python33Parser):
 
     def customize_grammar_rules(self, tokens, customize):
         self.remove_rules("""
+        yield_from    ::= expr expr YIELD_FROM
         # 3.4.2 has this. 3.4.4 may now
         # while1stmt ::= SETUP_LOOP l_stmts COME_FROM JUMP_BACK COME_FROM_LOOP
         """)

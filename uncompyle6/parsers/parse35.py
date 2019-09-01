@@ -28,7 +28,6 @@ class Python35Parser(Python34Parser):
         while1stmt     ::= SETUP_LOOP l_stmts POP_BLOCK COME_FROM_LOOP
         while1elsestmt ::= SETUP_LOOP l_stmts JUMP_BACK
                            POP_BLOCK else_suite COME_FROM_LOOP
-        whilestmt      ::= SETUP_LOOP testexpr returns POP_BLOCK COME_FROM_LOOP
 
         # The following rule is for Python 3.5+ where we can have stuff like
         # while ..
@@ -106,7 +105,6 @@ class Python35Parser(Python34Parser):
         return_if_stmt ::= ret_expr RETURN_END_IF POP_BLOCK
         return_if_lambda   ::= RETURN_END_IF_LAMBDA COME_FROM
 
-
         jb_else     ::= JUMP_BACK ELSE
         ifelsestmtc ::= testexpr c_stmts_opt JUMP_FORWARD else_suitec
         ifelsestmtl ::= testexpr c_stmts_opt jb_else else_suitel
@@ -160,7 +158,7 @@ class Python35Parser(Python34Parser):
                     call_token = tokens[i+1]
                     rule = 'call ::= expr unmapexpr ' + call_token.kind
                     self.addRule(rule, nop_func)
-            elif opname == 'BEFORE_ASYNC_WITH':
+            elif opname == 'BEFORE_ASYNC_WITH' and self.version < 3.8:
                 # Some Python 3.5+ async additions
                 rules_str = """
                    async_with_stmt ::= expr
@@ -169,7 +167,7 @@ class Python35Parser(Python34Parser):
                    async_with_stmt ::= expr
                             BEFORE_ASYNC_WITH GET_AWAITABLE LOAD_CONST YIELD_FROM
                             SETUP_ASYNC_WITH POP_TOP suite_stmts_opt
-                            POP_BLOCK LOAD_CONST
+                            POP_BLOCK LOAD_CONST COME_FROM_ASYNC_WITH
                             WITH_CLEANUP_START
                             GET_AWAITABLE LOAD_CONST YIELD_FROM
                             WITH_CLEANUP_FINISH END_FINALLY
@@ -179,7 +177,7 @@ class Python35Parser(Python34Parser):
                    async_with_as_stmt ::= expr
                                BEFORE_ASYNC_WITH GET_AWAITABLE LOAD_CONST YIELD_FROM
                                SETUP_ASYNC_WITH store suite_stmts_opt
-                               POP_BLOCK LOAD_CONST
+                               POP_BLOCK LOAD_CONST COME_FROM_ASYNC_WITH
                                WITH_CLEANUP_START
                                GET_AWAITABLE LOAD_CONST YIELD_FROM
                                WITH_CLEANUP_FINISH END_FINALLY

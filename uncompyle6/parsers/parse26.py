@@ -1,4 +1,4 @@
-#  Copyright (c) 2017-2018 Rocky Bernstein
+#  Copyright (c) 2017-2019 Rocky Bernstein
 """
 spark grammar differences over Python2 for Python 2.6.
 """
@@ -102,6 +102,8 @@ class Python26Parser(Python2Parser):
 
     def p_stmt26(self, args):
         """
+        stmt ::= ifelsestmtr
+
         # We use filler as a placeholder to keep nonterminal positions
         # the same across different grammars so that the same semantic actions
         # can be used
@@ -144,6 +146,11 @@ class Python26Parser(Python2Parser):
         whilestmt      ::= SETUP_LOOP testexpr l_stmts_opt jb_cf_pop POP_BLOCK
         whilestmt      ::= SETUP_LOOP testexpr returns POP_BLOCK COME_FROM
 
+        # In the "whilestmt" below, there isn't a COME_FROM when the
+        # "while" is the last thing in the module or function.
+
+        whilestmt      ::= SETUP_LOOP testexpr returns POP_TOP POP_BLOCK
+
         whileelsestmt  ::= SETUP_LOOP testexpr l_stmts_opt jb_pop POP_BLOCK
                            else_suitel COME_FROM
         while1elsestmt ::= SETUP_LOOP l_stmts JUMP_BACK else_suitel COME_FROM
@@ -173,6 +180,9 @@ class Python26Parser(Python2Parser):
         iflaststmt     ::= testexpr_then c_stmts_opt JUMP_ABSOLUTE come_froms POP_TOP
         iflaststmt     ::= testexpr      c_stmts_opt JUMP_ABSOLUTE come_froms POP_TOP
 
+        # "if"/"else" statement that ends in a RETURN
+        ifelsestmtr    ::= testexpr_then return_if_stmts returns
+
         testexpr_then  ::= testtrue_then
         testexpr_then  ::= testfalse_then
         testtrue_then  ::= expr jmp_true_then
@@ -181,7 +191,11 @@ class Python26Parser(Python2Parser):
         jmp_false_then ::= JUMP_IF_FALSE THEN POP_TOP
         jmp_true_then  ::= JUMP_IF_TRUE THEN POP_TOP
 
-        while1stmt ::= SETUP_LOOP returns COME_FROM
+        # In the "while1stmt" below, there sometimes isn't a
+        # "COME_FROM" when the "while1" is the last thing in the
+        # module or function.
+
+        while1stmt ::= SETUP_LOOP returns come_from_opt
         for_block  ::= returns _come_froms
         """
 
@@ -236,6 +250,9 @@ class Python26Parser(Python2Parser):
         genexpr_func ::= setup_loop_lf FOR_ITER store comp_iter JUMP_ABSOLUTE come_froms
                          POP_TOP jb_pop jb_pb_come_from
 
+        genexpr_func ::= setup_loop_lf FOR_ITER store comp_iter JUMP_BACK come_froms
+                         POP_TOP jb_pb_come_from
+
         generator_exp ::= LOAD_GENEXPR MAKE_FUNCTION_0 expr GET_ITER CALL_FUNCTION_1 COME_FROM
         list_if ::= list_if ::= expr jmp_false_then list_iter
         '''
@@ -267,6 +284,8 @@ class Python26Parser(Python2Parser):
         # Note: preserve positions 0 2 and 4 for semantic actions
         conditional_not    ::= expr jmp_true  expr jf_cf_pop expr COME_FROM
         conditional        ::= expr jmp_false expr jf_cf_pop expr come_from_opt
+        conditional        ::= expr jmp_false expr ja_cf_pop expr
+
         expr               ::= conditional_not
 
         and                ::= expr JUMP_IF_FALSE POP_TOP expr JUMP_IF_FALSE POP_TOP
@@ -291,19 +310,19 @@ class Python26Parser(Python2Parser):
         compare_chained2   ::= expr COMPARE_OP return_lambda
 
         return_if_lambda   ::= RETURN_END_IF_LAMBDA POP_TOP
-        stmt               ::= conditional_lambda
+        stmt               ::= if_expr_lambda
         stmt               ::= conditional_not_lambda
-        conditional_lambda ::= expr jmp_false_then expr return_if_lambda
+        if_expr_lambda     ::= expr jmp_false_then expr return_if_lambda
                                return_stmt_lambda LAMBDA_MARKER
         conditional_not_lambda ::=
                                expr jmp_true_then expr return_if_lambda
                                return_stmt_lambda LAMBDA_MARKER
 
-        # conditional_true are for conditions which always evaluate true
+        # if_expr_true are for conditions which always evaluate true
         # There is dead or non-optional remnants of the condition code though,
         # and we use that to match on to reconstruct the source more accurately
-        expr               ::= conditional_true
-        conditional_true   ::= expr jf_pop expr COME_FROM
+        expr               ::= if_expr_true
+        if_expr_true       ::= expr jf_pop expr COME_FROM
 
         # This comes from
         #   0 or max(5, 3) if 0 else 3

@@ -30,13 +30,12 @@ class AligningWalker(SourceWalker, object):
         self.current_line_number = 0
 
     def println(self, *data):
-        if data and not(len(data) == 1 and data[0] ==''):
+        if data and not(len(data) == 1 and data[0] == ''):
             self.write(*data)
 
         self.pending_newlines = max(self.pending_newlines, 1)
 
     def write(self, *data):
-        from trepan.api import debug; debug()
         if (len(data) == 1) and data[0] == self.indent:
             diff = max(self.pending_newlines,
                        self.desired_line_number - self.current_line_number)

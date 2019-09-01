@@ -15,7 +15,7 @@ else:
     def iteritems(d):
         return d.iteritems()
 
-from uncompyle6.semantics.pysource import SourceWalker as SourceWalker
+from uncompyle6.semantics.pysource import (SourceWalker, deparse_code2str)
 
 def test_template_engine():
     s = StringIO()
@@ -127,11 +127,17 @@ def test_tables():
                             "Full entry: %s" %
                             (name, k, arg, typ, entry[arg], type(entry[arg]), entry)
                             )
-                        assert len(tup) == 2
+                        assert 2 <= len(tup) <= 3
                         for j, x in enumerate(tup):
-                            assert isinstance(x, int), (
-                                "%s[%s][%d][%d] type '%s' is '%s should be an int but is %s. Full entry: %s" %
-                                (name, k, arg, j, typ, x, type(x), entry)
+                            if len(tup) == 3 and j == 1:
+                                assert isinstance(x, str), (
+                                    "%s[%s][%d][%d] type '%s' is '%s should be an string but is %s. Full entry: %s" %
+                                    (name, k, arg, j, typ, x, type(x), entry)
+                                    )
+                            else:
+                                assert isinstance(x, int), (
+                                    "%s[%s][%d][%d] type '%s' is '%s should be an int but is %s. Full entry: %s" %
+                                    (name, k, arg, j, typ, x, type(x), entry)
                                 )
                         pass
                     arg += 1
@@ -179,3 +185,11 @@ def test_tables():
             assert arg == len(entry), (
                 "%s[%s] arg %d should be length of entry %d. Full entry: %s" %
                             (name, k, arg, len(entry), entry))
+
+def test_deparse_code2str():
+    def deparse_test(co):
+        "This is a docstring"
+        s = deparse_code2str(co, debug_opts={"asm": "after", "tree": True})
+        assert s
+        return
+    deparse_test(deparse_test.__code__)
